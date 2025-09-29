@@ -1,0 +1,5 @@
+{
+  "name": "Dental OS - Settings",
+  "description": "A comprehensive settings module for a Dental OS, designed for practice management. It includes configurations for practice details, user roles, billing, integrations, and more, with features unlocked based on subscription tiers.",
+  "requestFramePermissions": []
+}
