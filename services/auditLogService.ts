@@ -1,3 +1,5 @@
+
+// Fix: Corrected import path
 import { UserRole } from '../types';
 
 export interface AuditLogEvent {
@@ -8,8 +10,37 @@ export interface AuditLogEvent {
     details: Record<string, any>;
 }
 
-// In-memory store for demonstration purposes
-const auditLogs: AuditLogEvent[] = [];
+// In-memory store with more mock data for demonstration purposes
+const auditLogs: AuditLogEvent[] = [
+    {
+        timestamp: new Date(new Date().setDate(new Date().getDate() - 1)),
+        user: 'Dr. Evelyn Reed',
+        role: 'Admin',
+        action: 'User role updated',
+        details: { targetUserId: 'user-4', targetUserName: 'Brian Hall', oldRole: 'Hygienist', newRole: 'ComplianceLead' }
+    },
+    {
+        timestamp: new Date(new Date().setHours(new Date().getHours() - 3)),
+        user: 'system',
+        role: 'Admin',
+        action: 'AI Task Executed',
+        details: { task: 'DAILY_BRIEF', latencyMs: '1203.45', simulatedCost: '$0.000045' }
+    },
+     {
+        timestamp: new Date(new Date().setHours(new Date().getHours() - 1)),
+        user: 'Charles Green',
+        role: 'Manager',
+        action: 'Inventory stock adjusted',
+        details: { itemId: 'item-1', locationId: 'loc-2', quantityChange: -5 }
+    },
+    {
+        timestamp: new Date(),
+        user: 'Dr. Evelyn Reed',
+        role: 'Admin',
+        action: 'Security policy updated',
+        details: { policy: 'sessionTimeoutMinutes', oldValue: 30, newValue: 60 }
+    }
+];
 
 /**
  * A placeholder for an audit logging service.

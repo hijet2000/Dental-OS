@@ -1,321 +1,373 @@
-import { Schema } from "@google/genai";
-import React from "react";
 
-// --- Base & Utility Types ---
-export type IconComponent = React.FC<React.SVGProps<SVGSVGElement>>;
 
-// --- AI & Logging Types ---
+// This file defines all the shared data structures and types used across the application.
 
-export enum AITaskType {
-    SUMMARIZE_MEETING_NOTES = 'SUMMARIZE_MEETING_NOTES',
-    GENERATE_PATIENT_EMAIL = 'GENERATE_PATIENT_EMAIL',
-    ANALYZE_SENTIMENT = 'ANALYZE_SENTIMENT',
-    ANALYZE_DENTAL_XRAY = 'ANALYZE_DENTAL_XRAY',
-    DAILY_BRIEFING = 'DAILY_BRIEFING',
-    NOSHOW_PREDICTION = 'NOSHOW_PREDICTION',
-    INVENTORY_REORDER = 'INVENTORY_REORDER',
-    SCHEDULE_OPTIMIZATION = 'SCHEDULE_OPTIMIZATION',
-    COMPLIANCE_REPORT_GEN = 'COMPLIANCE_REPORT_GEN',
-    COMPLIANCE_TASK_SUGGEST = 'COMPLIANCE_TASK_SUGGEST',
-    COMPLAINT_TRIAGE = 'COMPLAINT_TRIAGE',
-    COMPLAINT_THEME_ANALYSIS = 'COMPLAINT_THEME_ANALYSIS',
-    LAB_CHASE_EMAIL = 'LAB_CHASE_EMAIL',
+// --- User & Access Control ---
+
+export type UserRole = 'Admin' | 'Manager' | 'Dentist' | 'Hygienist' | 'Receptionist' | 'ComplianceLead' | 'PracticeManager';
+
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    avatarUrl: string;
+    pin: string;
+    homeLocationId?: string;
+    allowedLocationIds?: string[];
 }
 
+// --- Billing & Subscription ---
+
+export type SubscriptionPlan = 'Basic' | 'Pro' | 'Enterprise';
+
+export interface PlanFeature {
+    name: string;
+    included: boolean;
+}
+
+// --- AI & Tasks ---
 
 export interface AITask {
     name: string;
     description: string;
     prompt: (payload: any) => string;
-    responseSchema: Schema;
-    requiresImage?: boolean;
+    responseSchema: any; // from @google/genai Type
+    redact?: (payload: any) => any;
 }
 
-export type AILogStatus = 'Success' | 'Error' | 'Cached' | 'RateLimited';
+// --- Inventory & Equipment ---
 
-export interface AILogEntry {
-    id: string;
-    timestamp: Date;
-    taskType: AITaskType;
-    status: AILogStatus;
-    latencyMs: number;
-    cost: number;
-    inputPayload: any;
-    outputData?: any;
-    error?: string;
-}
-
-// --- User, Roles & Permissions ---
-
-export enum UserRole {
-    ADMIN = 'ADMIN',
-    MANAGER = 'MANAGER',
-    DENTIST = 'DENTIST',
-    HYGIENIST = 'HYGIENIST',
-    NURSE = 'NURSE',
-    RECEPTION = 'RECEPTION',
-    INVENTORY_LEAD = 'INVENTORY_LEAD',
-    COMPLIANCE_LEAD = 'COMPLIANCE_LEAD',
-    VIEWER = 'VIEWER'
-}
-
-export enum PermissionKey {
-    VIEW_DASHBOARD = 'VIEW_DASHBOARD',
-    VIEW_STAFF_DASHBOARD = 'VIEW_STAFF_DASHBOARD',
-    MANAGE_USERS = 'MANAGE_USERS',
-    MANAGE_SUBSCRIPTION = 'MANAGE_SUBSCRIPTION',
-
-    // AI & Integrations
-    RUN_AI_TASKS = 'RUN_AI_TASKS',
-    VIEW_AI_LOGS = 'VIEW_AI_LOGS',
-    CLEAR_AI_LOGS = 'CLEAR_AI_LOGS',
-
-    // Inventory
-    VIEW_INVENTORY = 'VIEW_INVENTORY',
-    MANAGE_INVENTORY_ITEMS = 'MANAGE_INVENTORY_ITEMS',
-    MANAGE_EQUIPMENT = 'MANAGE_EQUIPMENT',
-    APPROVE_INVENTORY_ADJUSTMENTS = 'APPROVE_INVENTORY_ADJUSTMENTS',
-    RUN_INVENTORY_REPORTS = 'RUN_INVENTORY_REPORTS',
-
-    // Tasks & QR
-    VIEW_TASKS = 'VIEW_TASKS',
-    COMPLETE_TASKS = 'COMPLETE_TASKS',
-    VERIFY_TASKS = 'VERIFY_TASKS',
-    MANAGE_TASK_DEFINITIONS = 'MANAGE_TASK_DEFINITIONS',
-
-    // Appointments
-    VIEW_APPOINTMENTS = 'VIEW_APPOINTMENTS',
-    MANAGE_APPOINTMENTS = 'MANAGE_APPOINTMENTS',
-    MANAGE_MESSAGING_TEMPLATES = 'MANAGE_MESSAGING_TEMPLATES',
-    VIEW_APPOINTMENT_LOGS = 'VIEW_APPOINTMENT_LOGS',
-
-    // Staff & Kiosk
-    VIEW_STAFF_LIST = 'VIEW_STAFF_LIST',
-    MANAGE_STAFF = 'MANAGE_STAFF',
-    MANAGE_ROTA = 'MANAGE_ROTA',
-    APPROVE_TIMEOFF = 'APPROVE_TIMEOFF',
-    EXPORT_PAYROLL = 'EXPORT_PAYROLL',
-    USE_KIOSK = 'USE_KIOSK',
-
-    // Compliance
-    VIEW_COMPLIANCE_TASKS = 'VIEW_COMPLIANCE_TASKS',
-    COMPLETE_COMPLIANCE_TASKS = 'COMPLETE_COMPLIANCE_TASKS',
-    MANAGE_COMPLIANCE_LIBRARY = 'MANAGE_COMPLIANCE_LIBRARY',
-    EXPORT_COMPLIANCE_REPORTS = 'EXPORT_COMPLIANCE_REPORTS',
-
-    // Labs & Complaints
-    VIEW_LAB_CASES = 'VIEW_LAB_CASES',
-    MANAGE_LAB_CASES = 'MANAGE_LAB_CASES',
-    VIEW_COMPLAINTS = 'VIEW_COMPLAINTS',
-    MANAGE_COMPLAINTS = 'MANAGE_COMPLAINTS',
-    
-    // Files & Data
-    MANAGE_FILES = 'MANAGE_FILES',
-    MANAGE_BACKUPS = 'MANAGE_BACKUPS',
-    IMPORT_EXPORT_DATA = 'IMPORT_EXPORT_DATA',
-    
-    // Branding & Security
-    MANAGE_BRANDING = 'MANAGE_BRANDING',
-    MANAGE_SECURITY = 'MANAGE_SECURITY',
-
-    // QA & DevOps
-    MANAGE_QA_DEVOPS = 'MANAGE_QA_DEVOPS',
-    
-    // Notifications
-    MANAGE_NOTIFICATIONS = 'MANAGE_NOTIFICATIONS',
-}
-
-
-// --- Subscription & Usage Types ---
-
-export enum SubscriptionPlan {
-    FREE = 'FREE',
-    PRO = 'PRO',
-    ENTERPRISE = 'ENTERPRISE',
-}
-
-export type AddonKey = 'ai_pack_1' | 'ai_pack_5' | 'extra_storage_10gb' | 'extra_sms_100';
-
-export interface Usage {
-    aiCalls: number;
-    smsSent: number;
-    storageGb: number;
-}
-
-export interface Subscription {
-    user: string;
-    plan: SubscriptionPlan;
-    usage: Usage;
-    purchasedAddons: Partial<Record<AddonKey, number>>;
-}
-
-// --- Module-specific types ---
-
-export interface InventoryItem {
+export interface StockCategory {
     id: string;
     name: string;
-    category: string;
-    stock: number;
-    reorderPoint: number;
-    targetStock: number;
-    supplierId: string;
-    qrCode: string;
-    usageLog: { date: string; quantity: number }[];
 }
 
-export interface Equipment {
+export interface StockLocation {
+    id: string;
+    name: string;
+}
+
+export interface StockLevel {
+    locationId: string;
+    quantity: number;
+}
+
+export interface StockItem {
+    id: string;
+    name: string;
+    itemCode: string;
+    category: StockCategory;
+    unit: string;
+    reorderPoint: number;
+    photoUrl: string;
+    stockLevels: StockLevel[];
+}
+
+export interface EquipmentItem {
     id: string;
     name: string;
     serialNumber: string;
-    purchaseDate: string;
-    warrantyExpiry: string;
+    locationId: string;
+    purchaseDate: Date;
+    warrantyExpires: Date;
+    lastServiceDate: Date;
     serviceIntervalMonths: number;
-    lastServiceDate: string;
-    qrCode: string;
+    photoUrl: string;
 }
 
-export interface TaskRun {
+export interface UsageLog {
     id: string;
-    defId: string;
-    qrAreaId: string;
-    dueDate: string;
-    status: 'pending' | 'completed' | 'verified' | 'overdue';
-    completedBy?: string;
-    completedAt?: string;
-    verifiedBy?: string;
-    verifiedAt?: string;
-    verificationScore?: number;
+    itemId: string;
+    quantityUsed: number;
+    usedBy: string;
+    date: Date;
 }
+
+// --- Compliance & Quality ---
+
+export interface Evidence {
+    id: string;
+    type: 'photo' | 'file' | 'note';
+    content: string; // Base64 for files/photos, text for notes
+    fileName?: string;
+    uploadedBy: string;
+    timestamp: Date;
+}
+
+export interface ComplianceDocument {
+    id: string;
+    name: string;
+    category: string;
+    responsibleRoleId: UserRole;
+    reviewCycleDays: number;
+    lastReviewed: Date;
+    evidence: Evidence[];
+    status: 'Compliant' | 'Due Soon' | 'Overdue';
+}
+
+export interface Lab {
+    id: string;
+    name: string;
+    contactEmail: string;
+}
+
+export interface LabCase {
+    id: string;
+    patientName: string;
+    labId: string;
+    caseType: string;
+    sentDate: Date;
+    dueDate: Date;
+    status: 'sent' | 'received' | 'overdue';
+}
+
+export interface Complaint {
+    id: string;
+    patientName: string;
+    date: Date;
+    description: string;
+    category: 'Clinical' | 'Billing' | 'Staff Attitude';
+    severity: 'Low' | 'Medium' | 'High';
+    status: 'open' | 'resolved';
+}
+
+// --- Tenant & Branding ---
+
+export interface TenantBranding {
+    tenantName: string;
+    logoUrl: string;
+    faviconUrl: string;
+    primaryColor: string;
+    secondaryColor: string;
+    defaultTheme: 'light' | 'dark';
+    pdfHeader: string;
+    pdfFooter: string;
+}
+
+// --- Security & Data Management ---
+
+export interface SecurityPolicies {
+    enforceStrongPasswords: boolean;
+    mfaEnabled: boolean;
+    sessionTimeoutMinutes: number;
+    ipAllowlist: string[];
+}
+
+export interface Backup {
+    id: string;
+    timestamp: Date;
+    fileName: string;
+    sizeBytes: number;
+}
+
+// --- Patients & Clinical ---
+
+export type NhsStatus = 'Paying' | 'Exempt - Under 18' | 'Exempt - Universal Credit' | 'Not Applicable';
 
 export interface Patient {
     id: string;
     name: string;
-    noShowHistory: number;
-    totalAppointments: number;
+    dateOfBirth: Date;
+    gender: 'Male' | 'Female' | 'Other';
+    nhsNumber: string;
+    address: string;
+    phone: string;
+    email: string;
+    avatarUrl: string;
+    allergies: string[];
+    medicalHistory: string[];
+    nhsStatus: NhsStatus;
+}
+
+export interface ClinicalNote {
+    id: string;
+    patientId: string;
+    authorId: string;
+    timestamp: Date;
+    title: string;
+    content: string;
 }
 
 export interface Appointment {
     id: string;
     patientId: string;
-    time: string;
+    staffId: string;
+    startTime: Date;
+    endTime: Date;
     type: string;
-    status: 'confirmed' | 'pending' | 'cancelled';
-    noShowRisk?: 'Low' | 'Medium' | 'High';
+    status: 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
 }
 
-export interface StaffMember {
+// --- Locations & Rota ---
+
+export interface Location {
     id: string;
     name: string;
-    role: UserRole;
-    pin: string;
-    qrBadge: string;
+    address: string;
+    timezone: string;
+    phone: string;
+    colorTag: string;
+    openingHours: {
+        day: string;
+        open: string;
+        close: string;
+        isOpen: boolean;
+    }[];
+    closureDates: { date: Date; reason: string }[];
 }
 
-export interface TimeOffRequest {
+export interface Surgery {
     id: string;
-    staffId: string;
-    startDate: string;
+    name: string;
+    locationId: string;
+    type: 'surgery' | 'hygiene';
+    isActive: boolean;
+}
 
-    endDate: string;
-    status: 'pending' | 'approved' | 'denied';
+export interface Break {
+    start: Date;
+    end: Date;
+    isPaid: boolean;
 }
-export interface RotaShift {
+
+export interface Shift {
     id: string;
     staffId: string;
-    day: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
-    startTime: string;
-    endTime: string;
+    locationId: string;
+    surgeryId?: string;
+    start: Date;
+    end: Date;
+    breaks: Break[];
+    isPublished: boolean;
+    source: 'manual' | 'generated';
 }
-export interface ClockInEvent {
+
+export interface TimePunch {
     id: string;
-    staffId: string;
-    timestamp: string;
+    userId: string;
     type: 'clock-in' | 'clock-out' | 'break-start' | 'break-end';
+    timestamp: Date;
+    isOffline: boolean;
 }
-export interface ComplianceTaskRun {
+
+export interface TimeOff {
     id: string;
-    defId: string;
-    dueDate: string;
-    status: 'compliant' | 'due_soon' | 'overdue';
-    completedAt?: string;
-    evidence?: { type: 'photo' | 'file' | 'note'; value: string };
+    staffId: string;
+    startDate: Date;
+    endDate: Date;
+    type: 'holiday' | 'sick' | 'unpaid';
+    status: 'pending' | 'approved' | 'rejected';
 }
-export interface LabCase {
-    id: string;
-    patientName: string;
-    labId: string;
-    sentDate: string;
-    dueDate: string;
-    status: 'sent' | 'in_progress' | 'completed' | 'overdue';
-}
-export interface Complaint {
-    id: string;
-    patientName: string;
-    date: string;
+
+// --- Patient Billing ---
+
+export interface InvoiceItem {
+    procedureCode: string;
     description: string;
-    severity: 'low' | 'medium' | 'high';
-    status: 'open' | 'resolved';
+    fee: number;
 }
 
-export interface BrandingSettings {
-    logoUrl: string | null;
-    faviconUrl: string | null;
-    colors: {
-        primary: string;
-        secondary: string;
-        accent: string;
-        text: string;
-        background: string;
-    };
-    theme: 'light' | 'dark';
-    pdfHeader: string;
-    pdfFooter: string;
-    qrSheetStyle: 'standard' | 'branded';
+export interface PatientInvoice {
+    id: string;
+    patientId: string;
+    date: Date;
+    items: InvoiceItem[];
+    total: number;
+    amountPaid: number;
+    status: 'draft' | 'sent' | 'paid' | 'overdue';
 }
 
-export interface SecuritySettings {
-    mfaEnabled: boolean;
-    sessionTimeoutMinutes: number;
-    passwordStrength: 'medium' | 'strong';
-    ipAllowlist: string[];
+export interface PatientPayment {
+    id: string;
+    patientId: string;
+    invoiceId: string;
+    date: Date;
+    amount: number;
+    method: 'cash' | 'credit_card';
+    transactionId?: string;
 }
 
-export interface StoredFile {
+export interface InsuranceClaim {
+    id: string;
+    invoiceId: string;
+    patientId: string;
+    submissionDate: Date;
+    status: 'submitted' | 'processing' | 'paid' | 'rejected';
+    trackingNumber: string;
+    amountPaid: number;
+}
+
+export interface ProcedureCode {
+    code: string;
+    description: string;
+    fee: number;
+}
+
+// --- NHS Management ---
+
+export interface NhsProcedure {
+    code: string;
+    description: string;
+    band: number | 'Urgent';
+    udas: number;
+}
+
+export interface CourseOfTreatment {
+    id: string;
+    patientId: string;
+    startDate: Date;
+    endDate?: Date;
+    status: 'active' | 'completed';
+    procedures: NhsProcedure[];
+    fp17ClaimId?: string;
+}
+
+export interface FP17Claim {
+    id: string;
+    courseOfTreatmentId: string;
+    submissionDate: Date;
+    totalUdas: number;
+    patientCharge: number;
+    status: 'submitted' | 'paid' | 'queried';
+    trackingNumber: string;
+}
+
+// --- Task Management (QR) ---
+
+export interface QRArea {
     id: string;
     name: string;
-    size: number;
-    type: string;
-    uploadedAt: string;
+    locationDescription: string;
+    qrCodeContent: string;
 }
 
-export interface BackupRecord {
+export interface TaskDef {
     id: string;
-    timestamp: string;
-    size: number;
-    status: 'completed' | 'in_progress' | 'failed';
+    title: string;
+    description: string;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'adhoc';
+    performerRoleId: UserRole;
+    verifierRoleId: UserRole;
+    slaMinutes: number;
 }
 
-export enum NotificationTrigger {
-    LOW_STOCK = 'LOW_STOCK',
-    OVERDUE_COMPLIANCE = 'OVERDUE_COMPLIANCE',
-    TASK_MISSED = 'TASK_MISSED',
-    HIGH_NOSHOW_RISK = 'HIGH_NOSHOW_RISK',
-    KIOSK_ANOMALY = 'KIOSK_ANOMALY',
-    PAYMENT_ISSUE = 'PAYMENT_ISSUE',
-}
-
-export enum NotificationChannel {
-    IN_APP = 'IN_APP',
-    EMAIL = 'EMAIL',
-    SMS = 'SMS',
-}
-
-export interface Notification {
+export interface TaskRun {
     id: string;
-    trigger: NotificationTrigger;
-    message: string;
-    timestamp: Date;
-    read: boolean;
+    taskDefId: string;
+    qrAreaId: string;
+    performedBy: string;
+    performedAt: Date;
+    isSlaBreached: boolean;
+    verificationId?: string;
 }
 
-export type FeatureFlagId = 'newDashboardBeta';
+export interface Verification {
+    id: string;
+    taskRunId: string;
+    verifiedBy: string;
+    verifiedAt: Date;
+    status: 'pass' | 'fail';
+    comment?: string;
+    photoUrl?: string;
+}

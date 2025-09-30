@@ -1,154 +1,152 @@
-import { AILogEntry, AITaskType, Subscription } from '../types';
-import { AI_TASK_CONFIG, PLANS_CONFIG, ADDONS_CONFIG } from '../constants';
-import { generateStructuredContent } from './geminiService';
-import { v4 as uuidv4 } from 'uuid';
+import { AITask } from '../types';
+import { Type } from '@google/genai';
 
-// --- Service Bus State (in-memory for simulation) ---
-let aiLogs: AILogEntry[] = [];
-const aiCache = new Map<string, { timestamp: number; data: any }>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// This file acts as a central registry for all predefined AI tasks in the application.
+// Each task definition includes the prompt, the expected JSON response schema,
+// and an optional function to redact Personally Identifiable Information (PII)
+// or Protected Health Information (PHI) before sending the data to the AI.
 
-// --- PHI Redaction ---
-const redactPHI = (payload: any): any => {
-    // In a real app, this would be a more robust library.
-    // For this simulation, we'll just look for specific keys.
-    if (!payload) return payload;
-    const redactedPayload = { ...payload };
-    if (redactedPayload.patientName) redactedPayload.patientName = '[REDACTED]';
-    if (redactedPayload.name) redactedPayload.name = '[REDACTED]';
-    return redactedPayload;
-};
+export const TASKS: { [key: string]: AITask } = {
+    DAILY_BRIEF: {
+        name: 'Daily Briefing',
+        description: 'Generates a summary of the day\'s key metrics and priorities for an admin or manager.',
+        prompt: (payload) => `
+            You are an AI assistant for a dental practice manager. 
+            Generate a concise daily briefing based on the following JSON data.
+            The summary should be a short, friendly overview.
+            The priorities should be a bulleted list of the most urgent items.
+            Focus on alerts like low stock, overdue items, and open complaints.
 
-
-// --- Service Bus Core ---
-class AIServiceBus {
-    private logsUpdateCallback: ((logs: AILogEntry[]) => void) | null = null;
-
-    public onLogsUpdate(callback: (logs: AILogEntry[]) => void) {
-        this.logsUpdateCallback = callback;
-    }
-
-    private addLogEntry(entry: Omit<AILogEntry, 'id' | 'timestamp'>) {
-        const newEntry: AILogEntry = {
-            ...entry,
-            id: uuidv4(),
-            timestamp: new Date(),
-        };
-        aiLogs = [newEntry, ...aiLogs];
-        this.logsUpdateCallback?.(aiLogs);
-    }
-
-    public getLogs = (): AILogEntry[] => aiLogs;
-    public clearLogs = () => {
-        aiLogs = [];
-        this.logsUpdateCallback?.(aiLogs);
-    };
-    public clearCache = () => aiCache.clear();
-
-    public async runTask<T>(
-        taskType: AITaskType,
-        payload: any,
-        subscription: Subscription
-    ): Promise<{ result: T, updatedSubscription: Subscription }> {
-        const startTime = Date.now();
-        const taskConfig = AI_TASK_CONFIG[taskType];
-        
-        // 1. Check Subscription Usage
-        const planLimits = PLANS_CONFIG[subscription.plan].limits;
-        const totalAddonAiCalls = Object.entries(subscription.purchasedAddons)
-            .reduce((sum, [key, quantity]) => {
-                const addonConfig = ADDONS_CONFIG[key as keyof typeof ADDONS_CONFIG];
-                if (addonConfig && addonConfig.aiCalls) {
-                    return sum + (addonConfig.aiCalls * Number(quantity));
-                }
-                return sum;
-            }, 0);
-        
-        const totalAiCallLimit = planLimits.aiCalls + totalAddonAiCalls;
-
-        if (subscription.usage.aiCalls >= totalAiCallLimit) {
-            const errorMsg = 'AI call limit for your subscription plan has been reached.';
-            this.addLogEntry({
-                taskType,
-                status: 'Error',
-                latencyMs: Date.now() - startTime,
-                cost: 0,
-                inputPayload: payload,
-                error: errorMsg,
-            });
-            throw new Error(errorMsg);
-        }
-
-        // 2. Caching
-        const cacheKey = `${taskType}:${JSON.stringify(payload)}`;
-        const cached = aiCache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-            this.addLogEntry({
-                taskType,
-                status: 'Cached',
-                latencyMs: Date.now() - startTime,
-                cost: 0,
-                inputPayload: payload,
-                outputData: cached.data,
-            });
-            return { result: cached.data as T, updatedSubscription: subscription };
-        }
-
-        // 3. Rate Limiting (Simulated)
-        if (Math.random() < 0.05) { // 5% chance of being "rate limited"
-            this.addLogEntry({
-                taskType,
-                status: 'RateLimited',
-                latencyMs: Date.now() - startTime,
-                cost: 0,
-                inputPayload: payload,
-                error: 'API rate limit exceeded.',
-            });
-            throw new Error('Rate limit exceeded. Please try again shortly.');
-        }
-
-        // 4. PHI Redaction
-        const redactedPayload = redactPHI(payload);
-
-        // 5. Execute Task
-        try {
-            const result = await generateStructuredContent(taskConfig, payload); // Pass original payload to Gemini
-            const latencyMs = Date.now() - startTime;
-            const simulatedCost = 0.001 + Math.random() * 0.002; 
-
-            this.addLogEntry({
-                taskType,
-                status: 'Success',
-                latencyMs,
-                cost: simulatedCost,
-                inputPayload: redactedPayload, // Log the redacted payload
-                outputData: result,
-            });
-
-            aiCache.set(cacheKey, { timestamp: Date.now(), data: result });
-            
-            // 6. Prepare updated subscription state
-            const updatedSubscription: Subscription = {
-                ...subscription,
-                usage: {
-                    ...subscription.usage,
-                    aiCalls: subscription.usage.aiCalls + 1,
-                },
+            Data:
+            ${JSON.stringify(payload)}
+        `,
+        responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                summary: { type: Type.STRING, description: 'A short, friendly overview of the day.' },
+                priorities: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'A list of key action items for the day.' },
+            }
+        },
+        redact: (payload) => {
+            // In a real app, we'd remove patient names from appointments, complaints, etc.
+            // For this demo, we'll just count them.
+            return {
+                appointmentCount: payload.appointments.length,
+                onDutyCount: payload.onDuty.length,
+                lowStockCount: payload.lowStock.length,
+                overdueComplianceCount: payload.overdueCompliance.length,
+                labsDueCount: payload.labsDue.length,
+                openComplaintsCount: payload.openComplaints.length,
             };
+        }
+    },
 
-            return { result: result as T, updatedSubscription };
-        } catch (error: any) {
-            this.addLogEntry({
-                taskType,
-                status: 'Error',
-                latencyMs: Date.now() - startTime,
-                cost: 0,
-                inputPayload: redactedPayload,
-                error: error.message || 'An unknown error occurred.',
-            });
-            throw error;
+    INVENTORY_REORDER: {
+        name: 'Inventory Reorder Suggestion',
+        description: 'Analyzes usage history for a low-stock item and suggests a reorder quantity.',
+        prompt: (payload) => `
+            You are an inventory management AI. A stock item "${payload.itemName}" is low.
+            Based on its recent usage history provided below (as JSON), suggest a smart reorder quantity.
+            Assume a 2-week lead time for orders and aim to have a 4-week supply on hand after the order arrives.
+            Today's date is ${new Date().toISOString().split('T')[0]}.
+
+            Usage History:
+            ${JSON.stringify(payload.usageHistory)}
+        `,
+        responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                suggestedQuantity: { type: Type.INTEGER, description: 'The suggested number of units to reorder.' }
+            }
+        }
+    },
+
+    LAB_CHASE_EMAIL: {
+        name: 'Lab Chase Email',
+        description: 'Generates a polite but firm email to a dental lab about an overdue case.',
+        prompt: (payload) => `
+            You are a dental practice manager's assistant.
+            Draft a professional email to a lab named "${payload.labName}" about an overdue lab case.
+            The case is for a "${payload.caseType}" and it is ${payload.daysOverdue} day(s) overdue.
+            The email should be polite but clearly ask for an immediate update on the status.
+            Provide a subject line and a body for the email.
+        `,
+        responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                subject: { type: Type.STRING, description: 'The suggested email subject line.' },
+                body: { type: Type.STRING, description: 'The suggested email body content.' },
+            }
+        }
+    },
+
+    COMPLAINT_TRIAGE: {
+        name: 'Complaint Triage',
+        description: 'Analyzes a new patient complaint and suggests its severity, category, and an action plan.',
+        prompt: (payload) => `
+            You are a quality assurance AI for a dental practice.
+            Analyze the following patient complaint and provide a structured triage assessment.
+            Categorize it into one of: Clinical, Billing, or Staff Attitude.
+            Assess the severity as one of: Low, Medium, or High.
+            Provide a simple, 3-step action plan for the manager to follow.
+
+            Complaint Description: "${payload.description}"
+        `,
+        responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                category: { type: Type.STRING, description: 'Suggested category (Clinical, Billing, Staff Attitude).' },
+                severity: { type: Type.STRING, description: 'Suggested severity (Low, Medium, High).' },
+                actionPlan: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'A 3-step action plan.' },
+            }
+        }
+    },
+    
+    SUGGEST_ROLE: {
+        name: 'Suggest Role',
+        description: 'Suggests a new role for a staff member based on their activity.',
+        prompt: (payload) => `
+            You are a Human Resources AI assistant for a dental practice.
+            A manager is considering changing the role for staff member "${payload.userName}", who is currently a "${payload.currentRole}".
+            Based on the following (simulated) recent activity, suggest a new, more appropriate role from the available list.
+            Provide a brief justification for your suggestion.
+            Available roles: ${JSON.stringify(payload.availableRoles)}
+
+            Recent Activity:
+            - Completed 15 compliance checks, more than anyone else on the team.
+            - Answered 5 patient billing queries successfully.
+            - Frequently helps organize inventory without being asked.
+        `,
+         responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                suggestedRole: { type: Type.STRING, description: 'The suggested role for the user.' },
+                justification: { type: Type.STRING, description: 'A brief explanation for the suggestion.' },
+            }
+        }
+    },
+
+    APP_ASSISTANT: {
+        name: 'In-App AI Assistant',
+        description: 'Acts as a helpful chatbot that can answer questions about the app state and user permissions.',
+        prompt: (payload) => `
+            You are a helpful AI assistant embedded in a dental practice management app.
+            Your name is ClinicOS AI.
+            The user, ${payload.userName}, is a ${payload.userRole}.
+            They are currently on the "${payload.currentPage}" page of the app.
+            Their permissions are: [${payload.userPermissions.join(', ')}].
+            Current app state: ${payload.lowStockCount} items are low on stock, ${payload.overdueComplianceCount} compliance documents are overdue.
+            
+            Answer the user's question concisely based on this context. Be helpful and aware of their role and permissions.
+            If you don't know the answer or it's outside your scope, say so politely.
+
+            User's question: "${payload.question}"
+        `,
+        responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+                answer: { type: Type.STRING, description: 'A helpful and context-aware answer to the user\'s question.'}
+            }
         }
     }
-}
-
-export const aiServiceBus = new AIServiceBus();
+};

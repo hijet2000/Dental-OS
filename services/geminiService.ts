@@ -1,4 +1,6 @@
+
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
+// Fix: Corrected import path
 import { AITask } from "../types";
 
 // Initialize the Google Gemini API client.
@@ -41,8 +43,8 @@ export const generateStructuredContent = async (task: AITask, payload: any): Pro
             },
         });
 
-        const text = response.text.trim();
         // The response from the API is a JSON string, so we parse it.
+        const text = response.text.trim();
         return JSON.parse(text);
 
     } catch (error) {

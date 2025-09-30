@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dental OS - Settings</title>
+    <link id="favicon" rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦷</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -11,11 +12,11 @@
         theme: {
           extend: {
             colors: {
-              'brand-primary': '#007A9E',
-              'brand-secondary': '#00B4D8',
-              'brand-accent': '#90E0EF',
-              'brand-light': '#CAF0F8',
-              'brand-dark': '#03045E',
+              'brand-primary': 'var(--brand-primary, #007A9E)',
+              'brand-secondary': 'var(--brand-secondary, #00B4D8)',
+              'brand-accent': 'var(--brand-accent, #90E0EF)',
+              'brand-light': 'var(--brand-light, #CAF0F8)',
+              'brand-dark': 'var(--brand-dark, #03045E)',
             },
           }
         }
@@ -28,7 +29,8 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0",
-    "uuid": "https://aistudiocdn.com/uuid@^13.0.0"
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+    "react-qr-code": "https://aistudiocdn.com/react-qr-code@^2.0.18"
   }
 }
 </script>
