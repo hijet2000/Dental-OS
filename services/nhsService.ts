@@ -24,7 +24,7 @@ export const nhsService = {
     getCoursesForPatient: (patientId: string): CourseOfTreatment[] => {
         return coursesOfTreatment
             .filter(cot => cot.patientId === patientId)
-            .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+            .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
     },
 
     getActiveCourseForPatient: (patientId: string): CourseOfTreatment | undefined => {

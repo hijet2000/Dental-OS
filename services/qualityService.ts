@@ -1,18 +1,23 @@
 
-// Fix: Corrected import path
 import { MOCK_LABS, MOCK_LAB_CASES, MOCK_COMPLAINTS } from '../constants';
-// Fix: Corrected import path
 import { Lab, LabCase, Complaint } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+
+const simulateDelay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // In-memory store for demonstration
 let labs: Lab[] = JSON.parse(JSON.stringify(MOCK_LABS));
-let labCases: LabCase[] = JSON.parse(JSON.stringify(MOCK_LAB_CASES)).map((c: any) => ({ ...c, sentDate: new Date(c.sentDate), dueDate: new Date(c.dueDate) }));
-let complaints: Complaint[] = JSON.parse(JSON.stringify(MOCK_COMPLAINTS)).map((c: any) => ({ ...c, date: new Date(c.date) }));
+let labCases: LabCase[] = JSON.parse(JSON.stringify(MOCK_LAB_CASES)).map((c: any, index: number) => ({ ...c, id: `case-${index + 1}`, sentDate: new Date(c.sentDate), dueDate: new Date(c.dueDate) }));
+let complaints: Complaint[] = JSON.parse(JSON.stringify(MOCK_COMPLAINTS)).map((c: any, index: number) => ({ ...c, id: `comp-${index + 1}`, date: new Date(c.date) }));
 
 export const qualityService = {
     // --- Labs ---
-    getLabs: (): Lab[] => [...labs],
-    getLabCases: (): LabCase[] => {
+    getLabs: async (): Promise<Lab[]> => {
+        await simulateDelay(200);
+        return [...labs];
+    },
+    getLabCases: async (): Promise<LabCase[]> => {
+        await simulateDelay(300);
         // Dynamically calculate status
         const today = new Date();
         return [...labCases].map(c => ({
@@ -20,23 +25,35 @@ export const qualityService = {
             status: c.status !== 'received' && today > c.dueDate ? 'overdue' : c.status
         })).sort((a,b) => a.dueDate.getTime() - b.dueDate.getTime());
     },
-    getLabById: (id: string): Lab | undefined => labs.find(l => l.id === id),
-    getLabsDueSoon: (days: number = 7): LabCase[] => {
+    getLabById: async (id: string): Promise<Lab | undefined> => {
+        await simulateDelay(50);
+        return labs.find(l => l.id === id)
+    },
+    getLabsDueSoon: async (days: number = 7): Promise<LabCase[]> => {
         const today = new Date();
         const threshold = new Date();
         threshold.setDate(today.getDate() + days);
-        return qualityService.getLabCases().filter(c => c.status !== 'received' && c.dueDate <= threshold);
+        const allCases = await qualityService.getLabCases();
+        return allCases.filter(c => c.status !== 'received' && c.dueDate <= threshold);
     },
 
     // --- Complaints ---
-    getComplaints: (): Complaint[] => [...complaints].sort((a,b) => b.date.getTime() - a.date.getTime()),
-    getOpenComplaints: (): Complaint[] => complaints.filter(c => c.status === 'open'),
-    addComplaint: (complaint: Omit<Complaint, 'id'>): Complaint => {
-        const newComplaint: Complaint = { ...complaint, id: `comp-${Date.now()}`};
+    getComplaints: async (): Promise<Complaint[]> => {
+        await simulateDelay(250);
+        return [...complaints].sort((a,b) => b.date.getTime() - a.date.getTime());
+    },
+    getOpenComplaints: async (): Promise<Complaint[]> => {
+        const allComplaints = await qualityService.getComplaints();
+        return allComplaints.filter(c => c.status === 'open');
+    },
+    addComplaint: async (complaint: Omit<Complaint, 'id'>): Promise<Complaint> => {
+        await simulateDelay(400);
+        const newComplaint: Complaint = { ...complaint, id: `comp-${uuidv4()}`};
         complaints.unshift(newComplaint);
         return newComplaint;
     },
-    updateComplaint: (id: string, updates: Partial<Complaint>): Complaint | undefined => {
+    updateComplaint: async (id: string, updates: Partial<Complaint>): Promise<Complaint | undefined> => {
+        await simulateDelay(200);
         const index = complaints.findIndex(c => c.id === id);
         if (index === -1) return undefined;
         complaints[index] = { ...complaints[index], ...updates };
@@ -44,21 +61,21 @@ export const qualityService = {
     },
 
     // --- Reporting Metrics ---
-    getAverageLabTurnaround: (): number => {
+    getAverageLabTurnaround: async (): Promise<number> => {
+        await simulateDelay(100);
         const receivedCases = labCases.filter(c => c.status === 'received');
         if (receivedCases.length === 0) return 0;
         const totalDays = receivedCases.reduce((acc, c) => {
-            // This is a simplification; a real app would need a "receivedDate"
             const turnaround = (c.dueDate.getTime() - c.sentDate.getTime()) / (1000 * 3600 * 24);
             return acc + turnaround;
         }, 0);
         return totalDays / receivedCases.length;
     },
-    getAverageComplaintResolutionTime: (): number => {
+    getAverageComplaintResolutionTime: async (): Promise<number> => {
+        await simulateDelay(100);
         const resolved = complaints.filter(c => c.status === 'resolved');
         if (resolved.length === 0) return 0;
          const totalDays = resolved.reduce((acc, c) => {
-            // This is a simplification; a real app would need a "resolvedDate"
             const resolutionTime = (new Date().getTime() - c.date.getTime()) / (1000 * 3600 * 24);
             return acc + resolutionTime;
         }, 0);
@@ -66,7 +83,8 @@ export const qualityService = {
     },
 
     // --- GDPR Functions ---
-    anonymizePatientRecords: (patientName: string): number => {
+    anonymizePatientRecords: async (patientName: string): Promise<number> => {
+        await simulateDelay(500);
         let anonymizedCount = 0;
         labCases = labCases.map(c => {
             if (c.patientName === patientName) {
@@ -85,7 +103,8 @@ export const qualityService = {
         return anonymizedCount;
     },
 
-    getPatientRecords: (patientName: string): { labCases: LabCase[], complaints: Complaint[] } => {
+    getPatientRecords: async (patientName: string): Promise<{ labCases: LabCase[], complaints: Complaint[] }> => {
+        await simulateDelay(150);
         const patientLabCases = labCases.filter(c => c.patientName === patientName);
         const patientComplaints = complaints.filter(c => c.patientName === patientName);
         return { labCases: patientLabCases, complaints: patientComplaints };

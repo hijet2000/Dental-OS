@@ -1,24 +1,20 @@
 {
-  "name": "dental-os---settings",
+  "name": "dental-os-settings",
+  "version": "1.0.0",
+  "description": "A comprehensive settings module for a Dental OS.",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "@google/genai": "^1.21.0",
-    "uuid": "^13.0.0",
-    "react-qr-code": "^2.0.18"
+    "prepare": "husky",
+    "lint": "eslint . --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write ."
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "husky": "^9.0.11",
+    "prettier": "^3.2.5"
   }
 }

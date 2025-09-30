@@ -1,4 +1,5 @@
 
+
 import { appointmentService } from './appointmentService';
 import { patientService } from './patientService';
 import { qualityService } from './qualityService';
@@ -12,13 +13,15 @@ export const gdprService = {
      * @param patientId The ID of the patient to export data for.
      * @returns A JSON string containing all of the patient's data.
      */
-    exportPatientData: (patientId: string): string => {
+    // FIX: Make function async to handle awaited calls
+    exportPatientData: async (patientId: string): Promise<string> => {
         const patient = patientService.getPatientById(patientId);
         if (!patient) {
             throw new Error("Patient not found");
         }
         const appointments = appointmentService.getAppointmentsForPatient(patientId);
-        const { labCases, complaints } = qualityService.getPatientRecords(patient.name);
+        // FIX: Await the async call to getPatientRecords
+        const { labCases, complaints } = await qualityService.getPatientRecords(patient.name);
 
         const exportData = {
             patientDetails: patient,
@@ -37,7 +40,8 @@ export const gdprService = {
      * @param currentUser The user performing the action, for auditing.
      * @returns A summary message of the actions taken.
      */
-    erasePatientData: (patientId: string, currentUser: { name: string, role: any }): string => {
+    // FIX: Make function async to handle awaited calls
+    erasePatientData: async (patientId: string, currentUser: { name: string, role: any }): Promise<string> => {
         const patientData = patientService.getPatientById(patientId);
         if (!patientData) {
             throw new Error("Patient not found");
@@ -53,7 +57,8 @@ export const gdprService = {
         const deletedAppointmentsCount = appointmentService.deleteAppointmentsForPatient(patientId);
         
         // 3. Anonymize records in other services
-        const anonymizedCount = qualityService.anonymizePatientRecords(patientData.name);
+        // FIX: Await the async call to anonymizePatientRecords
+        const anonymizedCount = await qualityService.anonymizePatientRecords(patientData.name);
 
         const summary = `${message} Deleted ${deletedAppointmentsCount} appointments. Anonymized ${anonymizedCount} related quality records.`;
 

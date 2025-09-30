@@ -1,74 +1,53 @@
-
-// Fix: Corrected import path
 import { MOCK_STOCK_ITEMS, MOCK_EQUIPMENT } from '../constants';
-// Fix: Corrected import path
-import { StockItem, EquipmentItem, UsageLog, StockLocation } from '../types';
+import { StockItem, EquipmentItem } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-// Fix: Corrected import path
-import { auditLogService } from './auditLogService';
 
-let stockItems: StockItem[] = JSON.parse(JSON.stringify(MOCK_STOCK_ITEMS));
-let equipment: EquipmentItem[] = JSON.parse(JSON.stringify(MOCK_EQUIPMENT)).map((e: any) => ({ ...e, purchaseDate: new Date(e.purchaseDate), warrantyExpires: new Date(e.warrantyExpires), lastServiceDate: new Date(e.lastServiceDate) }));
-let usageLogs: UsageLog[] = [];
-const locations: StockLocation[] = [
-    { id: 'loc-1', name: 'Main Storage' },
-    { id: 'loc-2', name: 'Sterilization Room' },
-];
+const STOCK_ITEMS_KEY = 'dentalos_stockItems';
+const EQUIPMENT_KEY = 'dentalos_equipment';
+
+// Initialize stock items from localStorage or mock data
+let stockItems: StockItem[] = (() => {
+    const saved = localStorage.getItem(STOCK_ITEMS_KEY);
+    if (saved) return JSON.parse(saved);
+    const initial = MOCK_STOCK_ITEMS.map((item, index) => ({ ...item, id: `item-${index + 1}` }));
+    localStorage.setItem(STOCK_ITEMS_KEY, JSON.stringify(initial));
+    return initial;
+})();
+
+// Initialize equipment from localStorage or mock data, with date re-hydration
+let equipment: EquipmentItem[] = (() => {
+    const saved = localStorage.getItem(EQUIPMENT_KEY);
+    const data = saved ? JSON.parse(saved) : MOCK_EQUIPMENT.map((item, index) => ({ ...item, id: `equip-${index + 1}` }));
+    const hydratedData = data.map((item: any) => ({
+        ...item,
+        purchaseDate: new Date(item.purchaseDate),
+        warrantyExpires: new Date(item.warrantyExpires),
+        lastServiceDate: new Date(item.lastServiceDate),
+    }));
+    if (!saved) {
+        localStorage.setItem(EQUIPMENT_KEY, JSON.stringify(hydratedData));
+    }
+    return hydratedData;
+})();
+
+
+const persistStock = () => localStorage.setItem(STOCK_ITEMS_KEY, JSON.stringify(stockItems));
+const persistEquipment = () => localStorage.setItem(EQUIPMENT_KEY, JSON.stringify(equipment));
 
 export const inventoryService = {
-    getStockItems: (): StockItem[] => [...stockItems],
-    getEquipment: (): EquipmentItem[] => [...equipment],
-    getLocations: (): StockLocation[] => [...locations],
+    getStockItems: (): StockItem[] => {
+        return [...stockItems];
+    },
+
+    getEquipment: (): EquipmentItem[] => {
+        return [...equipment];
+    },
 
     getLowStockItems: (): StockItem[] => {
         return stockItems.filter(item => {
-            const totalStock = item.stockLevels.reduce((sum, loc) => sum + loc.quantity, 0);
+            const totalStock = item.stockLevels.reduce((acc, level) => acc + level.quantity, 0);
             return totalStock <= item.reorderPoint;
         });
-    },
-
-    getEquipmentDueForService: (): EquipmentItem[] => {
-        return equipment.filter(eq => {
-            const nextServiceDate = new Date(eq.lastServiceDate);
-            nextServiceDate.setMonth(nextServiceDate.getMonth() + eq.serviceIntervalMonths);
-            return nextServiceDate <= new Date();
-        });
-    },
-
-    adjustStock: (itemId: string, locationId: string, quantityChange: number, userId: string): { success: boolean, message: string } => {
-        const itemIndex = stockItems.findIndex(i => i.id === itemId);
-        if (itemIndex === -1) return { success: false, message: "Item not found." };
-
-        const item = stockItems[itemIndex];
-        const locIndex = item.stockLevels.findIndex(sl => sl.locationId === locationId);
-
-        if (locIndex === -1) {
-            if (quantityChange < 0) return { success: false, message: "Cannot remove stock from a location with zero quantity." };
-            item.stockLevels.push({ locationId, quantity: quantityChange });
-        } else {
-            const newQuantity = item.stockLevels[locIndex].quantity + quantityChange;
-            if (newQuantity < 0) return { success: false, message: `Not enough stock in ${locations.find(l => l.id === locationId)?.name}.` };
-            item.stockLevels[locIndex].quantity = newQuantity;
-        }
-
-        if (quantityChange < 0) {
-            usageLogs.push({
-                id: uuidv4(),
-                itemId,
-                quantityUsed: Math.abs(quantityChange),
-                usedBy: userId,
-                date: new Date(),
-            });
-        }
-        
-        // Audit log might be too noisy for every adjustment, but good for demo
-        // auditLogService.log(userId, 'User', 'Inventory stock adjusted', { itemId, locationId, quantityChange });
-
-        return { success: true, message: "Stock adjusted." };
-    },
-    
-    getUsageLogsForItem: (itemId: string): UsageLog[] => {
-        return usageLogs.filter(log => log.itemId === itemId);
     },
 
     addMultipleStockItems: (items: Omit<StockItem, 'id'>[]): void => {
@@ -77,5 +56,6 @@ export const inventoryService = {
             id: `item-${uuidv4()}`
         }));
         stockItems.push(...newItems);
-    }
+        persistStock();
+    },
 };

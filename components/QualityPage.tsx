@@ -1,12 +1,11 @@
-
-import React, { useState, FC } from 'react';
+import React, { useState, FC, useEffect } from 'react';
 import { SettingsPanel } from './SettingsPage';
 import { qualityService } from '../services/qualityService';
 import { aiOrchestrationService } from '../services/aiOrchestrationService';
 import { useNotifications } from './Notification';
-// Fix: Corrected import path
 import { LabCase, Complaint, Lab } from '../types';
 import { SparklesIcon, ArrowPathIcon, BeakerIcon, ChatBubbleBottomCenterTextIcon } from './icons';
+import LoadingSpinner from './LoadingSpinner';
 
 type QualityTab = 'labs' | 'complaints';
 
@@ -23,12 +22,12 @@ const LabWork: FC<{ labs: Lab[], cases: LabCase[] }> = ({ labs, cases }) => {
 
         try {
             const daysOverdue = Math.floor((new Date().getTime() - labCase.dueDate.getTime()) / (1000 * 3600 * 24));
-            const result = await aiOrchestrationService.runTask<{ subject: string, body: string }>('LAB_CHASE_EMAIL', {
+            // FIX: Provide both generic type arguments to runTask.
+            const result = await aiOrchestrationService.runTask<{ subject: string, body: string }, 'LAB_CHASE_EMAIL'>('LAB_CHASE_EMAIL', {
                 labName: lab.name,
                 caseType: labCase.caseType,
                 daysOverdue: Math.max(1, daysOverdue),
             });
-            // In a real app, this would open an email client. Here, we'll show a notification.
             console.log('Generated Email:', result);
             addNotification({ type: 'info', message: `Email for ${lab.name} generated.`});
         } catch (error: any) {
@@ -148,9 +147,32 @@ const Complaints: FC<{ complaints: Complaint[] }> = ({ complaints }) => {
 // --- Main Component ---
 const QualityPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<QualityTab>('labs');
-    const labs = qualityService.getLabs();
-    const cases = qualityService.getLabCases();
-    const complaints = qualityService.getComplaints();
+    const [isLoading, setIsLoading] = useState(true);
+    const [labs, setLabs] = useState<Lab[]>([]);
+    const [cases, setCases] = useState<LabCase[]>([]);
+    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const { addNotification } = useNotifications();
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setIsLoading(true);
+                const [labsData, casesData, complaintsData] = await Promise.all([
+                    qualityService.getLabs(),
+                    qualityService.getLabCases(),
+                    qualityService.getComplaints()
+                ]);
+                setLabs(labsData);
+                setCases(casesData);
+                setComplaints(complaintsData);
+            } catch (error) {
+                addNotification({ type: 'error', message: 'Failed to load quality data.' });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchData();
+    }, [addNotification]);
 
     const TabButton: FC<{ tabName: QualityTab; label: string, icon: FC<any> }> = ({ tabName, label, icon: Icon }) => (
          <button
@@ -169,10 +191,14 @@ const QualityPage: React.FC = () => {
                     <TabButton tabName="labs" label="Lab Work" icon={BeakerIcon} />
                     <TabButton tabName="complaints" label="Complaints" icon={ChatBubbleBottomCenterTextIcon} />
                 </div>
-                <div className="mt-4">
-                    {activeTab === 'labs' && <LabWork labs={labs} cases={cases} />}
-                    {activeTab === 'complaints' && <Complaints complaints={complaints} />}
-                </div>
+                {isLoading ? (
+                    <LoadingSpinner />
+                ) : (
+                    <div className="mt-4">
+                        {activeTab === 'labs' && <LabWork labs={labs} cases={cases} />}
+                        {activeTab === 'complaints' && <Complaints complaints={complaints} />}
+                    </div>
+                )}
             </div>
         </SettingsPanel>
     );

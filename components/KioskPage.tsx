@@ -1,10 +1,8 @@
 
 import React, { useState, FC, useEffect } from 'react';
-// Fix: Corrected import path
 import { staffService } from '../services/staffService';
+import { User } from '../types';
 import { useNotifications } from './Notification';
-// Fix: Corrected import path
-import { User, TimePunch } from '../types';
 import { ClockIcon } from './icons';
 
 interface KioskPageProps {
@@ -12,17 +10,13 @@ interface KioskPageProps {
 }
 
 const KioskPage: FC<KioskPageProps> = ({ onExit }) => {
-    const [pin, setPin] = useState('');
-    const [authenticatedUser, setAuthenticatedUser] = useState<User | null>(null);
-    const [userStatus, setUserStatus] = useState<'Clocked Out' | 'On Shift' | 'On Break'>('Clocked Out');
-    const [currentTime, setCurrentTime] = useState(new Date());
-    const [isOffline, setIsOffline] = useState(false);
-    const [offlineQueue, setOfflineQueue] = useState<any[]>([]);
-
     const { addNotification } = useNotifications();
+    const [time, setTime] = useState(new Date());
+    const [pin, setPin] = useState('');
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
 
     useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        const timer = setInterval(() => setTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
 
@@ -31,129 +25,90 @@ const KioskPage: FC<KioskPageProps> = ({ onExit }) => {
             setPin(pin + digit);
         }
     };
-    
-    const handleBackspace = () => setPin(pin.slice(0, -1));
-    const handleClear = () => setPin('');
-    
-    const handleLogin = () => {
-        const user = staffService.getUserByPin(pin);
+
+    const handleBackspace = () => {
+        setPin(pin.slice(0, -1));
+    };
+
+    const handleLogin = async () => {
+        // FIX: Await async call to staffService
+        const user = await staffService.getUserByPin(pin);
         if (user) {
-            setAuthenticatedUser(user);
-            const status = staffService.getUserStatus(user.id);
-            setUserStatus(status.status);
-            addNotification({ type: 'success', message: `Welcome, ${user.name}!` });
-            handleClear();
+            setCurrentUser(user);
         } else {
             addNotification({ type: 'error', message: 'Invalid PIN.' });
-            handleClear();
+            setPin('');
         }
     };
-    
+
     const handleLogout = () => {
-        setAuthenticatedUser(null);
-        setUserStatus('Clocked Out');
+        setCurrentUser(null);
+        setPin('');
     };
 
-    const handlePunch = (type: TimePunch['type']) => {
-        if (!authenticatedUser) return;
-        
-        if (isOffline) {
-            const punch = { userId: authenticatedUser.id, type, isOffline: true };
-            setOfflineQueue(prev => [...prev, punch]);
-            addNotification({type: 'info', message: `Offline: Queued ${type} action.`});
-            // Optimistically update UI
-             const nextStatus = { 'clock-in': 'On Shift', 'clock-out': 'Clocked Out', 'break-start': 'On Break', 'break-end': 'On Shift' };
-             setUserStatus(nextStatus[type] as any);
-        } else {
-            const result = staffService.addPunch(authenticatedUser.id, type, false);
-            if(result.success) {
-                const newStatus = staffService.getUserStatus(authenticatedUser.id);
-                setUserStatus(newStatus.status);
-                addNotification({type: 'success', message: result.message});
-            } else {
-                addNotification({type: 'error', message: result.message});
-            }
+    const handlePunch = async (type: 'clock-in' | 'clock-out' | 'break-start' | 'break-end') => {
+        if (!currentUser) return;
+        // FIX: Await async call to staffService
+        const result = await staffService.addPunch(currentUser.id, type, false);
+        addNotification({ type: result.success ? 'success' : 'error', message: result.message });
+        if (result.success) {
+            handleLogout();
         }
     };
 
-    const syncOfflineQueue = () => {
-        let successCount = 0;
-        offlineQueue.forEach(p => {
-            const result = staffService.addPunch(p.userId, p.type, true);
-            if(result.success) successCount++;
-        });
-        setOfflineQueue([]);
-        addNotification({type: 'success', message: `Synced ${successCount} offline punches.`});
-        // Refresh status from source of truth after sync
-        if (authenticatedUser) {
-            setUserStatus(staffService.getUserStatus(authenticatedUser.id).status);
-        }
-    };
-
-    const PinPad = () => (
-        <div className="w-full max-w-xs mx-auto">
-            <div className="text-center mb-4">
-                <h2 className="text-2xl font-semibold">Enter PIN</h2>
-                <div className="h-10 mt-2 bg-white border rounded-md flex items-center justify-center text-2xl tracking-widest">
-                    {pin.split('').map((_, i) => '*').join('')}
-                </div>
+    const renderLoginScreen = () => (
+        <div className="w-full max-w-sm mx-auto">
+            <h2 className="text-3xl font-bold text-center">Enter PIN</h2>
+            <div className="my-6 h-12 flex justify-center items-center space-x-2">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className={`w-8 h-8 rounded-full border-2 ${pin.length > i ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}></div>
+                ))}
             </div>
-            <div className="grid grid-cols-3 gap-2">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => 
-                    <button key={d} onClick={() => handlePinInput(d.toString())} className="p-4 bg-white rounded-lg shadow text-xl font-bold hover:bg-gray-100">{d}</button>
-                )}
-                 <button onClick={handleClear} className="p-4 bg-yellow-400 rounded-lg shadow text-lg font-bold">C</button>
-                 <button onClick={() => handlePinInput('0')} className="p-4 bg-white rounded-lg shadow text-xl font-bold">0</button>
-                 <button onClick={handleBackspace} className="p-4 bg-red-500 text-white rounded-lg shadow text-lg font-bold">⌫</button>
+            <div className="grid grid-cols-3 gap-4">
+                {[...Array(9)].map((_, i) => (
+                    <button key={i + 1} onClick={() => handlePinInput(String(i + 1))} className="text-3xl p-4 bg-white rounded-lg shadow hover:bg-gray-100">{i + 1}</button>
+                ))}
+                <button onClick={handleBackspace} className="text-3xl p-4 bg-white rounded-lg shadow hover:bg-gray-100">⌫</button>
+                <button onClick={() => handlePinInput('0')} className="text-3xl p-4 bg-white rounded-lg shadow hover:bg-gray-100">0</button>
+                <button onClick={handleLogin} className="text-3xl p-4 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700">✓</button>
             </div>
-            <button onClick={handleLogin} className="w-full mt-4 p-4 bg-indigo-600 text-white rounded-lg shadow text-xl font-bold" disabled={pin.length !== 4}>Login</button>
         </div>
     );
-    
-    const ActionsPanel = () => {
-        if (!authenticatedUser) return null;
-        
-        return (
-            <div className="text-center">
-                <img src={authenticatedUser.avatarUrl} alt={authenticatedUser.name} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-white shadow-lg" />
-                <h2 className="text-3xl font-bold">Welcome, {authenticatedUser.name.split(' ')[0]}</h2>
-                <p className="text-lg text-gray-600 mt-1">Status: <span className="font-semibold text-indigo-800">{userStatus}</span></p>
 
-                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-md mx-auto">
-                    {userStatus === 'Clocked Out' && <button onClick={() => handlePunch('clock-in')} className="p-6 bg-green-500 text-white text-2xl font-bold rounded-lg shadow-lg hover:bg-green-600">Clock In</button>}
-                    {userStatus !== 'Clocked Out' && <button onClick={() => handlePunch('clock-out')} className="p-6 bg-red-500 text-white text-2xl font-bold rounded-lg shadow-lg hover:bg-red-600">Clock Out</button>}
-                    {userStatus === 'On Shift' && <button onClick={() => handlePunch('break-start')} className="p-6 bg-yellow-500 text-white text-2xl font-bold rounded-lg shadow-lg hover:bg-yellow-600">Start Break</button>}
-                    {userStatus === 'On Break' && <button onClick={() => handlePunch('break-end')} className="p-6 bg-blue-500 text-white text-2xl font-bold rounded-lg shadow-lg hover:bg-blue-600">End Break</button>}
+    const renderActionScreen = () => {
+        if (!currentUser) return null;
+        const userStatusInfo = staffService.getUserStatus(currentUser.id);
+
+        return (
+            <div className="w-full max-w-md mx-auto text-center">
+                <img src={currentUser.avatarUrl} alt="User" className="w-24 h-24 rounded-full mx-auto mb-4" />
+                <h2 className="text-3xl font-bold">Welcome, {currentUser.name.split(' ')[0]}</h2>
+                <p className="text-lg text-gray-600">Current Status: <span className="font-semibold">{userStatusInfo.status}</span></p>
+                <div className="mt-8 grid grid-cols-2 gap-4">
+                    {userStatusInfo.status === 'Clocked Out' && <button onClick={() => handlePunch('clock-in')} className="p-6 bg-green-500 text-white rounded-lg text-xl shadow">Clock In</button>}
+                    {userStatusInfo.status === 'On Shift' && <button onClick={() => handlePunch('clock-out')} className="p-6 bg-red-500 text-white rounded-lg text-xl shadow">Clock Out</button>}
+                    {userStatusInfo.status === 'On Shift' && <button onClick={() => handlePunch('break-start')} className="p-6 bg-yellow-500 text-white rounded-lg text-xl shadow">Start Break</button>}
+                    {userStatusInfo.status === 'On Break' && <button onClick={() => handlePunch('break-end')} className="p-6 bg-blue-500 text-white rounded-lg text-xl shadow">End Break</button>}
                 </div>
-                
-                <button onClick={handleLogout} className="mt-8 text-gray-500 hover:text-gray-800">Logout</button>
+                <button onClick={handleLogout} className="mt-8 text-gray-600 hover:underline">Not you? Log out</button>
             </div>
-        )
-    }
+        );
+    };
 
     return (
-        <div className="fixed inset-0 bg-gray-100 flex flex-col p-4 md:p-8">
-            <header className="flex justify-between items-start">
-                <div>
-                     <h1 className="text-3xl font-bold text-indigo-600 flex items-center"><ClockIcon className="w-8 h-8 mr-2"/> Time Clock Kiosk</h1>
-                     <p className="text-5xl font-light text-gray-800 mt-2">{currentTime.toLocaleTimeString()}</p>
-                     <p className="text-xl text-gray-500">{currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <div className="bg-gray-100 min-h-screen flex flex-col p-6">
+            <header className="flex justify-between items-center">
+                <div className="flex items-center text-xl font-bold">
+                    <ClockIcon className="w-8 h-8 mr-2" />
+                    <span>Clock In/Out Kiosk</span>
                 </div>
-                <button onClick={onExit} className="text-sm bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Exit Kiosk</button>
+                <button onClick={onExit} className="text-sm bg-white px-4 py-2 rounded-lg shadow">Exit Kiosk</button>
             </header>
-            
             <main className="flex-1 flex items-center justify-center">
-                {authenticatedUser ? <ActionsPanel /> : <PinPad />}
+                {currentUser ? renderActionScreen() : renderLoginScreen()}
             </main>
-
-            <footer className="text-center p-4">
-                 <div className="flex items-center justify-center my-4">
-                    <label htmlFor="offline-toggle" className="mr-2 text-sm font-medium text-gray-700">Simulate Offline Mode</label>
-                    <input type="checkbox" id="offline-toggle" checked={isOffline} onChange={() => setIsOffline(!isOffline)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                     {offlineQueue.length > 0 && !isOffline && (
-                        <button onClick={syncOfflineQueue} className="ml-4 text-sm bg-green-500 text-white px-3 py-1 rounded-md">Sync {offlineQueue.length} items</button>
-                     )}
-                </div>
+            <footer className="text-center text-gray-500">
+                <p>{time.toLocaleTimeString()} - {time.toLocaleDateString()}</p>
             </footer>
         </div>
     );

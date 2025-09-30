@@ -1,12 +1,11 @@
 
+
 import { appointmentService } from './appointmentService';
-// Fix: Corrected import path
 import { staffService } from './staffService';
 import { qualityService } from './qualityService';
-// Fix: Corrected import path
 import { MOCK_USERS } from '../constants';
-// Fix: Corrected import path
 import { TenantBranding } from '../types';
+import { cachingService } from './cachingService';
 
 
 export interface KPIData {
@@ -34,9 +33,15 @@ export const reportingService = {
      * @param endDate The end of the date range.
      * @returns An object containing calculated KPIs.
      */
-    generateReport: (startDate: Date, endDate: Date): KPIData => {
+    generateReport: async (startDate: Date, endDate: Date): Promise<KPIData> => {
+        const cacheKey = `report-${startDate.toISOString()}-${endDate.toISOString()}`;
+        const cachedData = cachingService.get<KPIData>(cacheKey);
+        if (cachedData) {
+            return cachedData;
+        }
+        
         // --- Appointment KPIs ---
-        const appointments = appointmentService.getAppointmentsInRange(startDate, endDate);
+        const appointments = await appointmentService.getAppointmentsInRange(startDate, endDate);
         const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24) + 1;
         const appointmentsPerDay = appointments.length / totalDays;
 
@@ -55,13 +60,13 @@ export const reportingService = {
         const chairUtilization = totalClinicMinutes > 0 ? (totalAppointmentMinutes / totalClinicMinutes) * 100 : 0;
 
         // --- Quality KPIs ---
-        const avgLabTurnaround = qualityService.getAverageLabTurnaround();
-        const labCases = qualityService.getLabCases();
+        const avgLabTurnaround = await qualityService.getAverageLabTurnaround();
+        const labCases = await qualityService.getLabCases();
         const overdueLabs = labCases.filter(c => c.status === 'overdue').length;
         const labSlaCompliance = labCases.length > 0 ? ((labCases.length - overdueLabs) / labCases.length) * 100 : 100;
-        const avgComplaintResolutionTime = qualityService.getAverageComplaintResolutionTime();
+        const avgComplaintResolutionTime = await qualityService.getAverageComplaintResolutionTime();
 
-        return {
+        const result: KPIData = {
             appointmentsPerDay: parseFloat(appointmentsPerDay.toFixed(1)),
             didNotAttendRate: parseFloat(didNotAttendRate.toFixed(1)),
             chairUtilization: parseFloat(chairUtilization.toFixed(1)),
@@ -69,6 +74,9 @@ export const reportingService = {
             labSlaCompliance: parseFloat(labSlaCompliance.toFixed(1)),
             avgComplaintResolutionTime: parseFloat(avgComplaintResolutionTime.toFixed(1)),
         };
+
+        cachingService.set(cacheKey, result, 300); // Cache for 5 minutes
+        return result;
     },
 
     exportReportToHtml: (kpiData: KPIData, branding: TenantBranding, dateRange: {start: Date, end: Date}): string => {

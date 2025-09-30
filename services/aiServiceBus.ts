@@ -1,4 +1,12 @@
-import { AITask } from '../types';
+import {
+    AITask,
+    DailyBriefPayload,
+    InventoryReorderPayload,
+    LabChaseEmailPayload,
+    ComplaintTriagePayload,
+    SuggestRolePayload,
+    AppAssistantPayload
+} from '../types';
 import { Type } from '@google/genai';
 
 // This file acts as a central registry for all predefined AI tasks in the application.
@@ -6,7 +14,24 @@ import { Type } from '@google/genai';
 // and an optional function to redact Personally Identifiable Information (PII)
 // or Protected Health Information (PHI) before sending the data to the AI.
 
-export const TASKS: { [key: string]: AITask } = {
+type AITaskRegistry = {
+    DAILY_BRIEF: AITask<DailyBriefPayload, {
+        appointmentCount: number;
+        onDutyCount: number;
+        lowStockCount: number;
+        overdueComplianceCount: number;
+        labsDueCount: number;
+        openComplaintsCount: number;
+    }>;
+    INVENTORY_REORDER: AITask<InventoryReorderPayload>;
+    LAB_CHASE_EMAIL: AITask<LabChaseEmailPayload>;
+    COMPLAINT_TRIAGE: AITask<ComplaintTriagePayload>;
+    SUGGEST_ROLE: AITask<SuggestRolePayload>;
+    APP_ASSISTANT: AITask<AppAssistantPayload>;
+}
+
+
+export const TASKS: AITaskRegistry = {
     DAILY_BRIEF: {
         name: 'Daily Briefing',
         description: 'Generates a summary of the day\'s key metrics and priorities for an admin or manager.',
@@ -27,7 +52,7 @@ export const TASKS: { [key: string]: AITask } = {
                 priorities: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'A list of key action items for the day.' },
             }
         },
-        redact: (payload) => {
+        redact: (payload: DailyBriefPayload) => {
             // In a real app, we'd remove patient names from appointments, complaints, etc.
             // For this demo, we'll just count them.
             return {
@@ -44,7 +69,7 @@ export const TASKS: { [key: string]: AITask } = {
     INVENTORY_REORDER: {
         name: 'Inventory Reorder Suggestion',
         description: 'Analyzes usage history for a low-stock item and suggests a reorder quantity.',
-        prompt: (payload) => `
+        prompt: (payload: InventoryReorderPayload) => `
             You are an inventory management AI. A stock item "${payload.itemName}" is low.
             Based on its recent usage history provided below (as JSON), suggest a smart reorder quantity.
             Assume a 2-week lead time for orders and aim to have a 4-week supply on hand after the order arrives.
@@ -64,7 +89,7 @@ export const TASKS: { [key: string]: AITask } = {
     LAB_CHASE_EMAIL: {
         name: 'Lab Chase Email',
         description: 'Generates a polite but firm email to a dental lab about an overdue case.',
-        prompt: (payload) => `
+        prompt: (payload: LabChaseEmailPayload) => `
             You are a dental practice manager's assistant.
             Draft a professional email to a lab named "${payload.labName}" about an overdue lab case.
             The case is for a "${payload.caseType}" and it is ${payload.daysOverdue} day(s) overdue.
@@ -83,7 +108,7 @@ export const TASKS: { [key: string]: AITask } = {
     COMPLAINT_TRIAGE: {
         name: 'Complaint Triage',
         description: 'Analyzes a new patient complaint and suggests its severity, category, and an action plan.',
-        prompt: (payload) => `
+        prompt: (payload: ComplaintTriagePayload) => `
             You are a quality assurance AI for a dental practice.
             Analyze the following patient complaint and provide a structured triage assessment.
             Categorize it into one of: Clinical, Billing, or Staff Attitude.
@@ -105,7 +130,7 @@ export const TASKS: { [key: string]: AITask } = {
     SUGGEST_ROLE: {
         name: 'Suggest Role',
         description: 'Suggests a new role for a staff member based on their activity.',
-        prompt: (payload) => `
+        prompt: (payload: SuggestRolePayload) => `
             You are a Human Resources AI assistant for a dental practice.
             A manager is considering changing the role for staff member "${payload.userName}", who is currently a "${payload.currentRole}".
             Based on the following (simulated) recent activity, suggest a new, more appropriate role from the available list.
@@ -129,7 +154,7 @@ export const TASKS: { [key: string]: AITask } = {
     APP_ASSISTANT: {
         name: 'In-App AI Assistant',
         description: 'Acts as a helpful chatbot that can answer questions about the app state and user permissions.',
-        prompt: (payload) => `
+        prompt: (payload: AppAssistantPayload) => `
             You are a helpful AI assistant embedded in a dental practice management app.
             Your name is ClinicOS AI.
             The user, ${payload.userName}, is a ${payload.userRole}.

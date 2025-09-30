@@ -1,69 +1,54 @@
 
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-// Fix: Corrected import path
-import { User, UserRole, SubscriptionPlan } from '../types';
-// Fix: Corrected import path
-import { MOCK_USERS } from '../constants';
-// Fix: Corrected import path
-import { auditLogService } from '../services/auditLogService';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { User, SubscriptionPlan } from '../types';
+import { staffService } from '../services/staffService'; // Assuming this service can provide users
 
 interface AppContextType {
     currentUser: User;
     users: User[];
     subscriptionPlan: SubscriptionPlan;
-    setCurrentUser: (user: User) => void;
     setSubscriptionPlan: (plan: SubscriptionPlan) => void;
-    updateUserProfile: (userId: string, updates: Partial<Pick<User, 'name' | 'email'>>) => void;
-    updateUserRole: (userId: string, newRole: UserRole) => void;
+    updateUserProfile: (userId: string, updates: Partial<User>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const initialUsers = MOCK_USERS;
-
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [users, setUsers] = useState<User[]>(initialUsers);
-    const [currentUser, setCurrentUser] = useState<User>(initialUsers[0]);
-    const [subscriptionPlan, setSubscriptionPlan] = useState<SubscriptionPlan>('Pro');
+    // FIX: Initialize with empty array and fetch users in useEffect.
+    const [users, setUsers] = useState<User[]>([]);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [subscriptionPlan, setSubscriptionPlan] = useState<SubscriptionPlan>('Enterprise');
 
-    const updateUserProfile = useCallback((userId: string, updates: Partial<Pick<User, 'name' | 'email'>>) => {
-        setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, ...updates } : u));
-        if (userId === currentUser.id) {
-            setCurrentUser(prev => ({ ...prev, ...updates }));
-        }
-    }, [currentUser.id]);
-
-    const updateUserRole = useCallback((userId: string, newRole: UserRole) => {
-        let oldRole: UserRole | undefined;
-        setUsers(prevUsers => prevUsers.map(u => {
-            if (u.id === userId) {
-                oldRole = u.role;
-                return { ...u, role: newRole };
+    useEffect(() => {
+        const fetchUsers = async () => {
+            const initialUsers = await staffService.getUsers();
+            setUsers(initialUsers);
+            if (initialUsers.length > 0) {
+                setCurrentUser(initialUsers[0]); // Default to first user, e.g., Admin
             }
-            return u;
-        }));
-        if (userId === currentUser.id) {
-            setCurrentUser(prev => ({ ...prev, role: newRole }));
+        };
+        fetchUsers();
+    }, []);
+
+    const updateUserProfile = (userId: string, updates: Partial<User>) => {
+        const newUsers = users.map(u => (u.id === userId ? { ...u, ...updates } : u));
+        setUsers(newUsers);
+        if (currentUser && currentUser.id === userId) {
+            setCurrentUser(prev => ({ ...prev!, ...updates }));
         }
-        const targetUser = users.find(u => u.id === userId);
-        if (targetUser) {
-            auditLogService.log(currentUser.name, currentUser.role, 'User role updated', {
-                targetUserId: userId,
-                targetUserName: targetUser.name,
-                oldRole,
-                newRole,
-            });
-        }
-    }, [currentUser.id, currentUser.name, currentUser.role, users]);
+    };
+
+    // Render children only when currentUser is loaded to avoid downstream errors
+    if (!currentUser) {
+        return null;
+    }
 
     const value = {
         currentUser,
         users,
         subscriptionPlan,
-        setCurrentUser,
         setSubscriptionPlan,
         updateUserProfile,
-        updateUserRole
     };
 
     return React.createElement(AppContext.Provider, { value }, children);
@@ -71,7 +56,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useApp = (): AppContextType => {
     const context = useContext(AppContext);
-    if (!context) {
+    if (context === undefined) {
         throw new Error('useApp must be used within an AppProvider');
     }
     return context;

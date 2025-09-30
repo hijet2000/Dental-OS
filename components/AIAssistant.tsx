@@ -1,11 +1,9 @@
-
 import React, { useState, FC, useRef, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
 import { useNotifications } from './Notification';
 import { aiOrchestrationService } from '../services/aiOrchestrationService';
 import { inventoryService } from '../services/inventoryService';
 import { complianceService } from '../services/complianceService';
-// Fix: Corrected import path
 import { rbacService } from '../services/rbacService';
 import { SparklesIcon, ArrowPathIcon } from './icons';
 
@@ -51,14 +49,15 @@ export const AIAssistant: FC<AIAssistantProps> = ({ isOpen, onClose, currentPage
             const payload = {
                 userName: currentUser.name,
                 userRole: currentUser.role,
-                userPermissions,
+                userPermissions: userPermissions.map(p => p),
                 currentPage: currentPage,
                 lowStockCount,
                 overdueComplianceCount,
                 question: userInput,
             };
 
-            const result = await aiOrchestrationService.runTask<{ answer: string }>('APP_ASSISTANT', payload);
+            // FIX: Provide both generic type arguments to runTask.
+            const result = await aiOrchestrationService.runTask<{ answer: string }, 'APP_ASSISTANT'>('APP_ASSISTANT', payload);
             setMessages([...newMessages, { sender: 'ai', text: result.answer }]);
         } catch (error: any) {
             const errorMessage = `Sorry, I encountered an error: ${error.message}`;

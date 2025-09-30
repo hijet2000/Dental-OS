@@ -1,10 +1,7 @@
 
+import { Type } from '@google/genai';
 
-// This file defines all the shared data structures and types used across the application.
-
-// --- User & Access Control ---
-
-export type UserRole = 'Admin' | 'Manager' | 'Dentist' | 'Hygienist' | 'Receptionist' | 'ComplianceLead' | 'PracticeManager';
+export type UserRole = 'Admin' | 'Manager' | 'Dentist' | 'Hygienist' | 'Receptionist' | 'ComplianceLead';
 
 export interface User {
     id: string;
@@ -13,11 +10,7 @@ export interface User {
     role: UserRole;
     avatarUrl: string;
     pin: string;
-    homeLocationId?: string;
-    allowedLocationIds?: string[];
 }
-
-// --- Billing & Subscription ---
 
 export type SubscriptionPlan = 'Basic' | 'Pro' | 'Enterprise';
 
@@ -25,114 +18,6 @@ export interface PlanFeature {
     name: string;
     included: boolean;
 }
-
-// --- AI & Tasks ---
-
-export interface AITask {
-    name: string;
-    description: string;
-    prompt: (payload: any) => string;
-    responseSchema: any; // from @google/genai Type
-    redact?: (payload: any) => any;
-}
-
-// --- Inventory & Equipment ---
-
-export interface StockCategory {
-    id: string;
-    name: string;
-}
-
-export interface StockLocation {
-    id: string;
-    name: string;
-}
-
-export interface StockLevel {
-    locationId: string;
-    quantity: number;
-}
-
-export interface StockItem {
-    id: string;
-    name: string;
-    itemCode: string;
-    category: StockCategory;
-    unit: string;
-    reorderPoint: number;
-    photoUrl: string;
-    stockLevels: StockLevel[];
-}
-
-export interface EquipmentItem {
-    id: string;
-    name: string;
-    serialNumber: string;
-    locationId: string;
-    purchaseDate: Date;
-    warrantyExpires: Date;
-    lastServiceDate: Date;
-    serviceIntervalMonths: number;
-    photoUrl: string;
-}
-
-export interface UsageLog {
-    id: string;
-    itemId: string;
-    quantityUsed: number;
-    usedBy: string;
-    date: Date;
-}
-
-// --- Compliance & Quality ---
-
-export interface Evidence {
-    id: string;
-    type: 'photo' | 'file' | 'note';
-    content: string; // Base64 for files/photos, text for notes
-    fileName?: string;
-    uploadedBy: string;
-    timestamp: Date;
-}
-
-export interface ComplianceDocument {
-    id: string;
-    name: string;
-    category: string;
-    responsibleRoleId: UserRole;
-    reviewCycleDays: number;
-    lastReviewed: Date;
-    evidence: Evidence[];
-    status: 'Compliant' | 'Due Soon' | 'Overdue';
-}
-
-export interface Lab {
-    id: string;
-    name: string;
-    contactEmail: string;
-}
-
-export interface LabCase {
-    id: string;
-    patientName: string;
-    labId: string;
-    caseType: string;
-    sentDate: Date;
-    dueDate: Date;
-    status: 'sent' | 'received' | 'overdue';
-}
-
-export interface Complaint {
-    id: string;
-    patientName: string;
-    date: Date;
-    description: string;
-    category: 'Clinical' | 'Billing' | 'Staff Attitude';
-    severity: 'Low' | 'Medium' | 'High';
-    status: 'open' | 'resolved';
-}
-
-// --- Tenant & Branding ---
 
 export interface TenantBranding {
     tenantName: string;
@@ -145,7 +30,158 @@ export interface TenantBranding {
     pdfFooter: string;
 }
 
-// --- Security & Data Management ---
+export interface JSONSchema {
+  type: Type;
+  description?: string;
+  properties?: Record<string, JSONSchema>;
+  items?: JSONSchema;
+  propertyOrdering?: string[];
+}
+
+export interface AITask<Payload = Record<string, unknown>, RedactedPayload = Payload> {
+    name: string;
+    description: string;
+    prompt: (payload: RedactedPayload) => string;
+    responseSchema: JSONSchema;
+    redact?: (payload: Payload) => RedactedPayload;
+}
+
+export interface ComplianceDocument {
+    id: string;
+    name: string;
+    category: string;
+    reviewCycleDays: number;
+    lastReviewed: Date;
+    status: 'Compliant' | 'Due Soon' | 'Overdue';
+}
+
+export interface StockItem {
+    id: string;
+    name: string;
+    itemCode: string;
+    category: { id: string; name: string };
+    unit: string;
+    reorderPoint: number;
+    photoUrl: string;
+    stockLevels: { locationId: string; quantity: number }[];
+}
+
+export interface EquipmentItem {
+    id: string;
+    name: string;
+    locationId: string;
+    purchaseDate: Date;
+    warrantyExpires: Date;
+    lastServiceDate: Date;
+    serviceIntervalMonths: number;
+}
+
+export interface OpeningHour {
+    day: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+    open: string;
+    close: string;
+    isOpen: boolean;
+}
+
+export interface Location {
+    id: string;
+    name: string;
+    address: string;
+    timezone: string;
+    phone: string;
+    colorTag: string;
+    openingHours: OpeningHour[];
+    closureDates: Date[];
+}
+
+export interface Surgery {
+    id: string;
+    name: string;
+    locationId: string;
+    type: 'surgery' | 'hygiene' | 'consult';
+    isActive: boolean;
+}
+
+export interface Appointment {
+    id: string;
+    patientId: string;
+    staffId: string;
+    startTime: Date;
+    endTime: Date;
+    type: string;
+    status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
+    notes?: string;
+}
+
+export interface TimePunch {
+    id: string;
+    userId: string;
+    type: 'clock-in' | 'clock-out' | 'break-start' | 'break-end';
+    timestamp: Date;
+    isOffline: boolean;
+}
+
+export interface UserStatus {
+    status: 'On Shift' | 'On Break' | 'Clocked Out';
+    lastPunch?: TimePunch;
+}
+
+export interface LiveUserStatus {
+    user: User;
+    status: UserStatus;
+}
+
+
+export interface Patient {
+    id: string;
+    name: string;
+    dateOfBirth: Date;
+    gender: 'Male' | 'Female' | 'Other';
+    address: string;
+    phone: string;
+    email: string;
+    nhsNumber: string;
+    nhsStatus: 'Paying' | 'Exempt';
+    avatarUrl: string;
+}
+
+export interface ClinicalNote {
+    id: string;
+    patientId: string;
+    authorId: string;
+    author?: User;
+    timestamp: Date;
+    title: string;
+    content: string;
+}
+
+export interface Lab {
+    id: string;
+    name: string;
+    contactPerson: string;
+    phone: string;
+    email: string;
+}
+
+export interface LabCase {
+    id: string;
+    patientName: string;
+    caseType: string;
+    labId: string;
+    sentDate: Date;
+    dueDate: Date;
+    status: 'sent' | 'received' | 'overdue';
+}
+
+export interface Complaint {
+    id: string;
+    patientName: string;
+    date: Date;
+    description: string;
+    category: 'Clinical' | 'Billing' | 'Staff Attitude' | 'Other';
+    severity: 'Low' | 'Medium' | 'High';
+    status: 'open' | 'resolved' | 'escalated';
+}
 
 export interface SecurityPolicies {
     enforceStrongPasswords: boolean;
@@ -161,121 +197,19 @@ export interface Backup {
     sizeBytes: number;
 }
 
-// --- Patients & Clinical ---
-
-export type NhsStatus = 'Paying' | 'Exempt - Under 18' | 'Exempt - Universal Credit' | 'Not Applicable';
-
-export interface Patient {
-    id: string;
-    name: string;
-    dateOfBirth: Date;
-    gender: 'Male' | 'Female' | 'Other';
-    nhsNumber: string;
-    address: string;
-    phone: string;
-    email: string;
-    avatarUrl: string;
-    allergies: string[];
-    medicalHistory: string[];
-    nhsStatus: NhsStatus;
-}
-
-export interface ClinicalNote {
-    id: string;
-    patientId: string;
-    authorId: string;
-    timestamp: Date;
-    title: string;
-    content: string;
-}
-
-export interface Appointment {
-    id: string;
-    patientId: string;
-    staffId: string;
-    startTime: Date;
-    endTime: Date;
-    type: string;
-    status: 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
-}
-
-// --- Locations & Rota ---
-
-export interface Location {
-    id: string;
-    name: string;
-    address: string;
-    timezone: string;
-    phone: string;
-    colorTag: string;
-    openingHours: {
-        day: string;
-        open: string;
-        close: string;
-        isOpen: boolean;
-    }[];
-    closureDates: { date: Date; reason: string }[];
-}
-
-export interface Surgery {
-    id: string;
-    name: string;
-    locationId: string;
-    type: 'surgery' | 'hygiene';
-    isActive: boolean;
-}
-
-export interface Break {
-    start: Date;
-    end: Date;
-    isPaid: boolean;
-}
-
-export interface Shift {
-    id: string;
-    staffId: string;
-    locationId: string;
-    surgeryId?: string;
-    start: Date;
-    end: Date;
-    breaks: Break[];
-    isPublished: boolean;
-    source: 'manual' | 'generated';
-}
-
-export interface TimePunch {
-    id: string;
-    userId: string;
-    type: 'clock-in' | 'clock-out' | 'break-start' | 'break-end';
-    timestamp: Date;
-    isOffline: boolean;
-}
-
-export interface TimeOff {
-    id: string;
-    staffId: string;
-    startDate: Date;
-    endDate: Date;
-    type: 'holiday' | 'sick' | 'unpaid';
-    status: 'pending' | 'approved' | 'rejected';
-}
-
-// --- Patient Billing ---
-
-export interface InvoiceItem {
-    procedureCode: string;
-    description: string;
-    fee: number;
-}
-
 export interface PatientInvoice {
     id: string;
     patientId: string;
     date: Date;
-    items: InvoiceItem[];
+    dueDate: Date;
     total: number;
     amountPaid: number;
     status: 'draft' | 'sent' | 'paid' | 'overdue';
+    items: {
+        description: string;
+        quantity: number;
+        unitPrice: number;
+    }[];
 }
 
 export interface PatientPayment {
@@ -284,33 +218,22 @@ export interface PatientPayment {
     invoiceId: string;
     date: Date;
     amount: number;
-    method: 'cash' | 'credit_card';
-    transactionId?: string;
+    method: 'credit_card' | 'cash' | 'insurance';
 }
 
 export interface InsuranceClaim {
     id: string;
     invoiceId: string;
-    patientId: string;
     submissionDate: Date;
-    status: 'submitted' | 'processing' | 'paid' | 'rejected';
+    status: 'submitted' | 'approved' | 'denied';
     trackingNumber: string;
-    amountPaid: number;
 }
-
-export interface ProcedureCode {
-    code: string;
-    description: string;
-    fee: number;
-}
-
-// --- NHS Management ---
 
 export interface NhsProcedure {
     code: string;
     description: string;
-    band: number | 'Urgent';
     udas: number;
+    band: number | 'Urgent';
 }
 
 export interface CourseOfTreatment {
@@ -329,11 +252,9 @@ export interface FP17Claim {
     submissionDate: Date;
     totalUdas: number;
     patientCharge: number;
-    status: 'submitted' | 'paid' | 'queried';
+    status: 'submitted' | 'reconciled' | 'rejected';
     trackingNumber: string;
 }
-
-// --- Task Management (QR) ---
 
 export interface QRArea {
     id: string;
@@ -346,28 +267,89 @@ export interface TaskDef {
     id: string;
     title: string;
     description: string;
-    frequency: 'daily' | 'weekly' | 'monthly' | 'adhoc';
+    frequency: 'daily' | 'weekly' | 'ad-hoc';
     performerRoleId: UserRole;
     verifierRoleId: UserRole;
     slaMinutes: number;
+    pointsValue: number;
 }
 
 export interface TaskRun {
     id: string;
     taskDefId: string;
-    qrAreaId: string;
-    performedBy: string;
+    performerId: string;
     performedAt: Date;
-    isSlaBreached: boolean;
+    qrAreaId: string;
     verificationId?: string;
+    isSlaBreached: boolean;
 }
 
 export interface Verification {
     id: string;
     taskRunId: string;
-    verifiedBy: string;
+    verifierId: string;
     verifiedAt: Date;
-    status: 'pass' | 'fail';
-    comment?: string;
-    photoUrl?: string;
+    score: number; // e.g., 1-5
+    comments?: string;
+}
+
+export interface Shift {
+    id: string;
+    staffId: string;
+    locationId: string;
+    start: Date;
+    end: Date;
+    role: UserRole;
+    isPublished: boolean;
+}
+
+export interface TimeOff {
+    id: string;
+    staffId: string;
+    startDate: Date;
+    endDate: Date;
+    type: 'holiday' | 'sick' | 'unpaid';
+    status: 'pending' | 'approved' | 'rejected';
+    notes?: string;
+}
+
+// Payloads for AI Tasks
+export interface DailyBriefPayload {
+    appointments: Appointment[];
+    onDuty: LiveUserStatus[];
+    lowStock: StockItem[];
+    overdueCompliance: ComplianceDocument[];
+    labsDue: LabCase[];
+    openComplaints: Complaint[];
+}
+
+export interface InventoryReorderPayload {
+    itemName: string;
+    usageHistory: { date: string; quantityUsed: number }[];
+}
+
+export interface LabChaseEmailPayload {
+    labName: string;
+    caseType: string;
+    daysOverdue: number;
+}
+
+export interface ComplaintTriagePayload {
+    description: string;
+}
+
+export interface SuggestRolePayload {
+    userName: string;
+    currentRole: UserRole;
+    availableRoles: UserRole[];
+}
+
+export interface AppAssistantPayload {
+    userName: string;
+    userRole: UserRole;
+    userPermissions: string[];
+    currentPage: string;
+    lowStockCount: number;
+    overdueComplianceCount: number;
+    question: string;
 }

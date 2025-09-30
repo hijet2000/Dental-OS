@@ -16,16 +16,20 @@ const KPI_METRICS: { key: keyof KPIData, label: string, unit: string, higherIsBe
 const ReportsPage: FC = () => {
     const { addNotification } = useNotifications();
     const [kpiData, setKpiData] = useState<KPIData | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
     const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const handleGenerateReport = () => {
+    const handleGenerateReport = async () => {
+        setIsLoading(true);
         try {
-            const data = reportingService.generateReport(new Date(startDate), new Date(endDate));
+            const data = await reportingService.generateReport(new Date(startDate), new Date(endDate));
             setKpiData(data);
             addNotification({type: 'success', message: 'Report generated.'});
         } catch (error: any) {
             addNotification({type: 'error', message: `Failed to generate report: ${error.message}`})
+        } finally {
+            setIsLoading(false);
         }
     };
     
@@ -36,7 +40,9 @@ const ReportsPage: FC = () => {
                 <div className="flex items-center space-x-4">
                     <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-2 border rounded-md" />
                     <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border rounded-md" />
-                    <button onClick={handleGenerateReport} className="bg-indigo-600 text-white px-4 py-2 rounded-md">Generate Report</button>
+                    <button onClick={handleGenerateReport} disabled={isLoading} className="bg-indigo-600 text-white px-4 py-2 rounded-md disabled:bg-indigo-400">
+                        {isLoading ? 'Generating...' : 'Generate Report'}
+                    </button>
                 </div>
             </div>
 

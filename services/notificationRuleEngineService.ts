@@ -1,4 +1,5 @@
-import { UserRole } from "../types";
+
+import { UserRole, User } from "../types";
 import { emailService } from "./emailService";
 import { staffService } from "./staffService";
 import { smsService } from "./smsService";
@@ -38,18 +39,21 @@ export const notificationRuleEngineService = {
      * @param event The type of event that occurred.
      * @param payload Data related to the event to be used in templates.
      */
-    processEvent: (event: NotificationEvent, payload: Record<string, any>): void => {
+    // FIX: Make function async and await staffService calls
+    processEvent: async (event: NotificationEvent, payload: Record<string, any>): Promise<void> => {
         console.log(`[NotificationEngine] Processing event: ${event}`, payload);
         const matchingRules = notificationRules.filter(rule => rule.event === event);
 
-        matchingRules.forEach(rule => {
+        // FIX: Use for...of loop to handle async operations inside
+        for (const rule of matchingRules) {
             const message = mergeTemplate(rule.template, payload);
             
-            let recipients = [];
+            let recipients: User[] = [];
             if (rule.recipientRole) {
-                recipients = staffService.getUsers().filter(u => u.role === rule.recipientRole);
+                const users = await staffService.getUsers();
+                recipients = users.filter(u => u.role === rule.recipientRole);
             } else if (rule.recipient === 'USER_IN_PAYLOAD' && payload.userId) {
-                const user = staffService.getUserById(payload.userId);
+                const user = await staffService.getUserById(payload.userId);
                 if (user) recipients.push(user);
             }
 
@@ -65,7 +69,7 @@ export const notificationRuleEngineService = {
                      recipients.forEach(user => smsService.send(user, message));
                     break;
             }
-        });
+        }
     },
 
     /**

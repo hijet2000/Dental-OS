@@ -1,5 +1,4 @@
 
-// Fix: Corrected import path
 import { UserRole } from '../types';
 
 export interface AuditLogEvent {

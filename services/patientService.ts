@@ -1,42 +1,45 @@
-// Fix: Corrected import path
-import { MOCK_PATIENTS } from '../constants';
-// Fix: Corrected import path
-import { Patient, NhsStatus } from '../types';
 
-// In-memory store for demonstration
-let patients: Patient[] = JSON.parse(JSON.stringify(MOCK_PATIENTS)).map((p: Patient) => ({...p, dateOfBirth: new Date(p.dateOfBirth)}));
+import { MOCK_PATIENTS } from '../constants';
+import { Patient } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+
+let patients: Patient[] = JSON.parse(JSON.stringify(MOCK_PATIENTS));
+
+const persistPatients = () => {
+    // In a real app this would be an API call.
+    // Here we're just keeping the in-memory array, but a localStorage implementation could go here.
+};
 
 export const patientService = {
-    // --- Data Retrieval ---
     getPatients: (): Patient[] => {
-        return [...patients];
+        return [...patients].sort((a, b) => a.name.localeCompare(b.name));
     },
-    
+
     getPatientById: (id: string): Patient | undefined => {
         return patients.find(p => p.id === id);
     },
 
-    // --- Data Mutation ---
-    updatePatient: (patientId: string, updates: Partial<Patient>): Patient | undefined => {
-        const index = patients.findIndex(p => p.id === patientId);
-        if (index === -1) return undefined;
-        patients[index] = { ...patients[index], ...updates };
-        return patients[index];
-    },
-    
-    updatePatientNhsStatus: (patientId: string, nhsStatus: NhsStatus): Patient | undefined => {
-        const index = patients.findIndex(p => p.id === patientId);
-        if (index === -1) return undefined;
-        patients[index].nhsStatus = nhsStatus;
-        return patients[index];
+    savePatient: (patientData: Omit<Patient, 'id'> & { id?: string }): Patient => {
+        if (patientData.id) {
+            const index = patients.findIndex(p => p.id === patientData.id);
+            if (index !== -1) {
+                patients[index] = { ...patients[index], ...patientData, id: patientData.id };
+                persistPatients();
+                return patients[index];
+            }
+        }
+        const newPatient: Patient = { ...patientData, id: `pat-${uuidv4()}` };
+        patients.push(newPatient);
+        persistPatients();
+        return newPatient;
     },
 
-    // --- GDPR ---
-    deletePatient: (patientId: string): { success: boolean, message: string } => {
-        const initialCount = patients.length;
-        patients = patients.filter(p => p.id !== patientId);
-        if (patients.length < initialCount) {
-             return { success: true, message: `Deleted patient record.`};
+    deletePatient: (id: string): { success: boolean, message: string } => {
+        const initialLength = patients.length;
+        patients = patients.filter(p => p.id !== id);
+        if (patients.length < initialLength) {
+            persistPatients();
+            return { success: true, message: `Patient record deleted.` };
         }
         return { success: false, message: 'Patient not found.' };
     },

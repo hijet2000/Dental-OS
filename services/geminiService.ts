@@ -1,56 +1,41 @@
 
-import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
-// Fix: Corrected import path
-import { AITask } from "../types";
+import { GoogleGenAI, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
 
-// Initialize the Google Gemini API client.
-// The API key is sourced from the `process.env.API_KEY` environment variable,
-// which is assumed to be configured in the execution environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// As per guidelines, the API key must be from process.env.API_KEY
+const API_KEY = process.env.API_KEY;
+
+if (!API_KEY) {
+  // In a real app, you'd have more robust error handling or a fallback.
+  // For this project, we'll throw to make it clear configuration is missing.
+  console.error("API_KEY environment variable not set. AI features will fail.");
+}
+
+// Initialize with a named parameter as per guidelines
+const ai = new GoogleGenAI({ apiKey: API_KEY! });
 
 /**
- * Generates structured JSON content using the Gemini API based on a given task configuration.
- * This function is now multimodal and can handle both text and image inputs.
- * @param task The AI task configuration containing the prompt and response schema.
- * @param payload The data to be injected into the prompt, may include image data.
- * @returns The generated and parsed JSON object.
+ * A wrapper around the Gemini API for generating content, following project guidelines.
  */
-export const generateStructuredContent = async (task: AITask, payload: any): Promise<any> => {
-    const prompt = task.prompt(payload);
-
-    // Check for image data in the payload to construct a multimodal request
-    const imagePart = payload.image && payload.imageMimeType
-        ? {
-              inlineData: {
-                  mimeType: payload.imageMimeType,
-                  data: payload.image,
-              },
-          }
-        : null;
-
-    const textPart = { text: prompt };
-
-    // Use multipart content if an image is present, otherwise use the simple prompt string
-    const contents = imagePart ? { parts: [textPart, imagePart] } : prompt;
-
-    try {
-        const response: GenerateContentResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: contents, // This now handles both string and multipart content
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: task.responseSchema,
-            },
-        });
-
-        // The response from the API is a JSON string, so we parse it.
-        const text = response.text.trim();
-        return JSON.parse(text);
-
-    } catch (error) {
-        console.error(`Error generating content for task type: ${task.name}`, error);
-        // In a real app, you'd have more robust error handling,
-        // maybe classifying errors (e.g., API vs. parsing errors).
-        throw new Error(`Failed to process AI task: ${task.name}.`);
-    }
+export const geminiService = {
+    /**
+     * Generates content using the Gemini API.
+     * @param params The parameters for the generateContent call.
+     * @returns A promise that resolves with the generation result.
+     */
+    generateContent: async (params: GenerateContentParameters): Promise<GenerateContentResponse> => {
+        try {
+            // As per guidelines, use 'gemini-2.5-flash' for general text tasks.
+            const model = params.model || 'gemini-2.5-flash';
+            const response = await ai.models.generateContent({ ...params, model });
+            // As per guidelines, directly return the response object.
+            return response;
+        } catch (error) {
+            console.error("Error calling Gemini API:", error);
+            // Implement robust error handling as per guidelines
+            if (error instanceof Error) {
+                 throw new Error(`Failed to generate content from Gemini API: ${error.message}`);
+            }
+            throw new Error("An unknown error occurred while calling the Gemini API.");
+        }
+    },
 };

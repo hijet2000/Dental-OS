@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import SettingsPage from './components/SettingsPage';
 import KioskPage from './components/KioskPage';
@@ -6,9 +8,7 @@ import { NotificationProvider, useNotifications } from './components/Notificatio
 import { AppProvider } from './hooks/useApp';
 import { BrandingProvider } from './hooks/useBranding';
 import { complianceService } from './services/complianceService';
-// Fix: Corrected import path
 import { staffService } from './services/staffService';
-// Fix: Corrected import path
 import { notificationRuleEngineService } from './services/notificationRuleEngineService';
 
 const BackgroundChecker: React.FC = () => {
